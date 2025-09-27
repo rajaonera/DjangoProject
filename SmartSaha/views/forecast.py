@@ -24,7 +24,7 @@ class YieldForecastView(APIView):
             )
 
         # Calculer la prévision
-        service = YieldForecastService(parcel_crop_id)
+        service = YieldForecastService(parcel_crop)
         forecast = service.save_forecast(days_ahead=7)
         if forecast:
             return Response({

@@ -15,82 +15,22 @@ class ParcelDataService:
         return parcel.points[0]
 
     @staticmethod
-    def fetch_soil(parcel: Parcel) -> SoilData | None:
-        """
-        Récupère les données du sol pour une parcelle.
-        - Vérifie la dernière entrée existante.
-        - Si mean non-null, retourne l'objet existant.
-        - Sinon, itère sur tous les points pour trouver des données valides.
-        - Si aucun point n'est valide, prend le dernier point et l'enregistre.
-        """
+    def fetch_soil(parcel: Parcel):
         soil_data_obj = SoilData.objects.filter(parcel=parcel).order_by('-created_at').last()
-
-        def has_non_null_mean(data: dict) -> bool:
-            return any(
-                d["values"]["mean"] is not None
-                for layer in data.get("properties", {}).get("layers", [])
-                for d in layer.get("depths", [])
-            )
-
-        # Si déjà existant et valide
-        if soil_data_obj and has_non_null_mean(soil_data_obj.data):
+        if soil_data_obj:
             return soil_data_obj
 
-        points = parcel.points
-        last_data = None  # stocke le dernier point pour fallback
-
-        for point in points:
-            lat, lon = point["lat"], point["lng"]
-            print(f"lat: {lat}, lon: {lon}")
-            url = (
-                f"https://rest.isric.org/soilgrids/v2.0/properties/query?"
-                f"lon={lon}&lat={lat}&property=phh2o&property=soc&property=nitrogen"
-                f"&property=sand&property=clay&property=silt&depth=0-5cm&value=mean"
-            )
-
-            try:
-                resp = requests.get(url, timeout=60)
-                resp.raise_for_status()
-                data = resp.json()
-                last_data = data  # toujours stocker le dernier
-
-                if has_non_null_mean(data):
-                    # Conversion des d_factor
-                    for layer in data["properties"]["layers"]:
-                        factor = layer.get("unit_measure", {}).get("d_factor", 1)
-                        for d in layer["depths"]:
-                            if d["values"]["mean"] is not None:
-                                d["values"]["mean"] = d["values"]["mean"] / factor
-
-                    # Update ou création
-                    if soil_data_obj:
-                        soil_data_obj.data = data
-                        soil_data_obj.save()
-                        return soil_data_obj
-                    else:
-                        return SoilData.objects.create(parcel=parcel, data=data)
-
-            except requests.RequestException as e:
-                print(f"[ERROR] SoilGrids API failed for point ({lat}, {lon}): {e}")
-                continue
-
-        # Aucun point valide trouvé, fallback sur le dernier point
-        if last_data:
-            # Conversion d_factor même si tout null
-            for layer in last_data["properties"]["layers"]:
-                factor = layer.get("unit_measure", {}).get("d_factor", 1)
-                for d in layer["depths"]:
-                    if d["values"]["mean"] is not None:
-                        d["values"]["mean"] = d["values"]["mean"] / factor
-
-            if soil_data_obj:
-                soil_data_obj.data = last_data
-                soil_data_obj.save()
-                return soil_data_obj
-            else:
-                return SoilData.objects.create(parcel=parcel, data=last_data)
-
-        return soil_data_obj  # jamais arrivé sauf si aucun point existant
+        point = ParcelDataService.get_first_point(parcel)
+        lat, lon = point["lat"], point["lng"]
+        url = (
+            f"https://rest.isric.org/soilgrids/v2.0/properties/query?"
+            f"lon={lon}&lat={lat}&property=phh2o&property=soc&property=nitrogen"
+            f"&property=sand&property=clay&property=silt&depth=0-5cm&value=mean"
+        )
+        resp = requests.get(url)
+        if resp.status_code == 200:
+            return SoilData.objects.create(parcel=parcel, data=resp.json())
+        return None
 
     @staticmethod
     def fetch_climate(parcel: Parcel, start=None, end=None):
@@ -114,7 +54,7 @@ class ParcelDataService:
         return None
 
     @staticmethod
-    @lru_cache(maxsize=128)
+    # @lru_cache(maxsize=128)
     def build_parcel_crops(parcel):
         parcel_crops_info = []
         for pc in parcel.parcel_crops.all():
@@ -145,7 +85,7 @@ class ParcelDataService:
         return parcel_crops_info
 
     @staticmethod
-    @lru_cache(maxsize=128)
+    # @lru_cache(maxsize=128)
     def build_yield_records(parcel):
         yield_records = []
         for pc in parcel.parcel_crops.all():

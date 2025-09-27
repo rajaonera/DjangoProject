@@ -135,32 +135,37 @@ class YieldAnalyticsService:
 
 
     def get_user_stats(self):
-        """
-        Retourne les statistiques pour toutes les parcelles de l'utilisateur sous forme JSON
-        """
-        # Récupère toutes les yield records de l'utilisateur
-        records = YieldRecord.objects.select_related("parcel_crop__parcel") \
-            .filter(parcel_crop__parcel__owner=self.user)
+        records = YieldRecord.objects.select_related("parcelCrop__parcel") \
+            .filter(parcelCrop__parcel__owner=self.user)
 
         if not records.exists():
             return {}
 
-        # Convertir en DataFrame
         data = list(records.values(
-            "parcel_crop_id", "parcel_crop__parcel__parcel_name", "year", "yield_amount", "area"
+            "parcelCrop_id",
+            "parcelCrop__parcel__parcel_name",
+            "date",          # <-- utilise date
+            "yield_amount",
+            "area"
         ))
         df = pd.DataFrame(data)
+
+        # Ajouter la colonne 'year' depuis la date
+        df["year"] = pd.to_datetime(df["date"]).dt.year
+
+        # Rendement par hectare
         df["yield_per_area"] = df["yield_amount"] / df["area"]
 
-        # Grouper par parcelle et générer stats par parcelle
         stats_json = {}
-        for parcel_id, group in df.groupby("parcel_crop_id"):
+        for parcel_id, group in df.groupby("parcelCrop_id"):
             stats_json[parcel_id] = {
-                "parcel_name": group["parcel_crop__parcel__parcel_name"].iloc[0],
+                "parcel_name": group["parcelCrop__parcel__parcel_name"].iloc[0],
                 "years": group["year"].tolist(),
+                "dates": group["date"].astype(str).tolist(),
                 "yield_amount": group["yield_amount"].tolist(),
                 "yield_per_area": group["yield_per_area"].tolist(),
                 "mean_yield": group["yield_amount"].mean(),
                 "mean_yield_per_area": group["yield_per_area"].mean(),
             }
         return stats_json
+

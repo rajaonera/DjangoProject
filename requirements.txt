@@ -11,3 +11,8 @@ psycopg2-binary>=2.9,<3.0
 requests>=2.31,<3.0
 pandas>=2.1,<3.0
 python-dotenv>=1.0,<2.0
+gunicorn>=21.2,<22.0
+whitenoise>=6.7,<7.0
+dj-database-url>=2.2,<3.0
+drf_yasg
+django-cors-headers

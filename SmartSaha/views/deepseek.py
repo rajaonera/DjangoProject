@@ -9,10 +9,14 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from SmartSaha.services import DeepSeekClient
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
 
 deepseek = DeepSeekClient()
 
 class AgronomyAssistantAPIView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
     def post(self, request):
         question = request.data.get("question")
         question_type = request.data.get("question_type", "general")

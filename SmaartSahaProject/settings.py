@@ -31,6 +31,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # API Key OpenRouter
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
+# Vérification pour debug (à enlever en prod)
+if not OPENROUTER_API_KEY:
+    print("⚠️ OPENROUTER_API_KEY n'est pas défini !")
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -185,6 +189,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://precision-agriculture-two.vercel.app",
+    "https://precision-agriculture-virid.vercel.app",
     "https://app.smart-saha.com",
 ]
 

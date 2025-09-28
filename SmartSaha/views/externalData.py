@@ -6,7 +6,6 @@ from rest_framework.response import Response
 from rest_framework import status, viewsets
 
 from SmartSaha.models import Parcel, SoilData, ClimateData
-from SmartSaha.services import ParcelDataService
 from SmartSaha.services.climate import get_climate_data
 from SmartSaha.services.soilsGrids import get_soil_data
 import requests
@@ -45,26 +44,17 @@ class DataViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=["post"])
     def fetch_soil(self, request, pk=None):
-        try:
-            parcel = Parcel.objects.get(pk=pk)
-        except Parcel.DoesNotExist:
-            return Response({"error": "Parcel not found"}, status=404)
+        parcel = Parcel.objects.get(pk=pk)
+        # Récupère le premier point du JSON
+        first_point = parcel.points[0]  # si points est une liste
+        lat, lon = first_point["lat"], first_point["lng"]
+        url = f"https://rest.isric.org/soilgrids/v2.0/properties/query?lon={lon}&lat={lat}&property=phh2o&property=soc&property=nitrogen&property=sand&property=clay&property=silt&depth=0-5cm&value=mean"
+        resp = requests.get(url)
+        if resp.status_code == 200:
+            soil = SoilData.objects.create(parcel=parcel, data=resp.json())
+            return Response({"status": "soil stored", "id": soil.id})
+        return Response({"error": "soil api failed"}, status=resp.status_code)
 
-        # Appelle notre service centralisé
-        soil = ParcelDataService.fetch_soil(parcel)
-
-        if soil:
-            return Response({
-                "status": "soil data retrieved",
-                "id": soil.id,
-                "mean_values_exist": any(
-                    d["values"]["mean"] is not None
-                    for layer in soil.data.get("properties", {}).get("layers", [])
-                    for d in layer.get("depths", [])
-                )
-            })
-        else:
-            return Response({"error": "No valid soil data available"}, status=400)
     @action(detail=True, methods=["post"])
     def fetch_climate(self, request, pk=None):
         parcel = Parcel.objects.get(pk=pk)

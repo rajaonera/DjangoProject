@@ -1,8 +1,6 @@
-
 import httpx
 import os
 from django.conf import settings
-
 
 from SmartSaha.services.context_builder import ContextBuilder
 
@@ -14,6 +12,7 @@ Reponds toujours de maniere précise, pratique, court et adaptee aux conditions 
 - si cest un estimation, calcule avec les donnees qu on te fourni et tes connaissances
 - Si tu ne sais pas, indique clairement que l’information n’est pas disponible.
 """
+
 class DeepSeekClient:
     def __init__(self, model="deepseek/deepseek-r1:free"):
         self.api_key = getattr(settings, "OPENROUTER_API_KEY", None) or os.getenv("OPENROUTER_API_KEY")
@@ -39,9 +38,16 @@ class DeepSeekClient:
         }
 
         with httpx.Client(timeout=60.0) as client:
-            response = client.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
-            response.raise_for_status()  # déclenche une exception si 4xx/5xx
-            data = response.json()
+            try:
+                response = client.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
+                print("Status:", response.status_code)
+                print("Response:", response.text[:500])  # debug rapide
+                response.raise_for_status()
+                data = response.json()
+            except httpx.HTTPStatusError as e:
+                return f"Erreur API OpenRouter ({e.response.status_code}): {e.response.text}"
+            except Exception as e:
+                return f"Erreur interne: {str(e)}"
 
         # Retourne le contenu de la réponse
         try:
